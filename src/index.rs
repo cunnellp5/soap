@@ -1,0 +1,87 @@
+use axum::{extract::State, response::Html};
+use crate::state::AppState;
+
+pub async fn index(State(state): State<AppState>) -> Html<String> {
+    let list_html = render_list(&state);
+    Html(format!(
+        r##"<!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Rust Axum HTMX Todo App</title>
+          <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+          <style>
+            body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }}
+            h1 {{ margin-bottom: 1rem; }}
+            form {{ display: flex; gap: .5rem; margin-bottom: 1rem; }}
+            input[type=text] {{ flex: 1; padding: .6rem .8rem; border: 1px solid #ddd; border-radius: .5rem; }}
+            button {{ padding: .6rem 1rem; border: 0; border-radius: .5rem; background: #f97316; color: #fff; cursor: pointer; }}
+            ul {{ list-style: none; padding: 0; }}
+            li {{ display: flex; align-items: center; gap: .6rem; padding: .4rem 0; border-bottom: 1px dashed #eee; }}
+            li button {{ margin-left: auto; background:#ef4444; color:white; }}
+            li input[type=checkbox] {{ transform: translateY(1px); }}
+            .done {{ text-decoration: line-through; color: #888; }}
+            .muted {{ color: #666; font-size: .9rem; }}
+          </style>
+        </head>
+        <body>
+          <h1>Todos</h1>
+
+          <form 
+            hx-post="/add" 
+            hx-target="#todo-list" 
+            hx-swap="outerHTML"
+            hx-on::after-request="this.reset(); this.querySelector('input[name=text]').focus();">
+            <input 
+                type="text" 
+                name="text" 
+                placeholder="Add a task..." 
+                required 
+                autofocus>
+            <button type="submit">Add</button>
+          </form>
+
+          {list_html}
+
+          <p class="muted">Tip: HTMX replaces only the list container on submit—no full page reload.</p>
+        </body>
+        </html>"##
+    ))
+}
+
+
+
+pub(crate) fn render_list(state: &AppState) -> String {
+    let todos = state.todos.lock().expect("poisoned");
+    let items = if todos.is_empty() {
+        r#"<li class="muted">No tasks yet. Add your first one above.</li>"#.to_string()
+    } else {
+        todos.iter()
+            .map(|t| {
+                let cls = if t.done { "done" } else { "" };
+                let checked = if t.done { "checked" } else { "" };
+                format!(
+                    r##"<li>
+                        <input type="checkbox" {checked}
+                              hx-patch="/todos/{id}/toggle"
+                              hx-target="#todo-list" hx-swap="outerHTML">
+                        <span class="{cls}">{text}</span>
+                        <button
+                            hx-delete="/todos/{id}"
+                            hx-target="#todo-list" hx-swap="outerHTML"
+                            aria-label="Delete">✕</button>
+                    </li>"##,
+                    id = t.id,
+                    text = html_escape(&t.text),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    format!(r#"<div id="todo-list"><ul>{items}</ul></div>"#)
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
