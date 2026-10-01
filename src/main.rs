@@ -1,11 +1,17 @@
-mod handlers;
-mod index;
-mod state;
+mod todo;
 
-use axum::{routing::{get, post}, Router};
-use handlers::{add_todo, delete_todo, toggle_todo};
-use index::index;
-use state::AppState;
+use axum::{
+    // extract::{Form, Path, State},
+    // response::Html,
+    routing::{get, post}, 
+    Router
+};
+
+use todo::{
+    handlers::{add_todo, delete_todo, toggle_todo},
+    index::index,
+    state::AppState,
+};
 
 use std::{sync::{Arc, Mutex}, net::SocketAddr};
 

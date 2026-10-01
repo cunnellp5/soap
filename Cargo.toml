@@ -7,3 +7,6 @@ edition = "2024"
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "macros", "chrono"] }
+dotenvy = "0.15"
+chrono = { version = "0.4", features = ["clock"] }
