@@ -1,25 +1,30 @@
 mod todo;
 
 use axum::{
-    // extract::{Form, Path, State},
-    // response::Html,
     routing::{get, post}, 
     Router
 };
-
-use todo::{
-    handlers::{add_todo, delete_todo, toggle_todo},
-    index::index,
+use dotenvy::dotenv;
+use sqlx::{sqlite::SqlitePoolOptions};
+use crate::todo::{
+    index::{add_todo, delete_todo, index, toggle_todo},
     state::AppState,
 };
-
-use std::{sync::{Arc, Mutex}, net::SocketAddr};
+use std::{env, net::SocketAddr};
 
 #[tokio::main]
-async fn main() {
-    let state = AppState{
-        todos: Arc::new(Mutex::new(Vec::new()))
-    };
+async fn main() -> anyhow::Result<()> {
+    dotenv().ok(); // load .env if present
+
+    let db_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set, e.g. sqlite://todos.db");
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await?;
+
+    let state = AppState { pool };
 
     // define a router with a single route
     let app = Router::new()
@@ -41,4 +46,6 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .unwrap();
+
+    Ok(())
 }

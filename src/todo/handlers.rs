@@ -1,55 +1,49 @@
-use axum::{
-    extract::{Form, Path, State},
-    response::Html,
-};
 use crate::todo::{
-    index::render_list,
-    state::{AppState, Todo},
+    state::{Todo},
 };
-
+use sqlx::{SqlitePool};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub(crate) struct NewTodo {
-    text: String,
+    pub(crate) text: String,
 }
 
-pub(crate) async fn add_todo(
-    State(state): State<AppState>,
-    Form(new): Form<NewTodo>,
-) -> Html<String> {
-    let mut todos = state.todos.lock().expect("poisoned");
-    let next_id = todos.last().map(|t| t.id + 1).unwrap_or(1);
-
-    todos.push(Todo { 
-        id: next_id,
-        text: new.text, 
-        done: false 
-    });
-
-    drop(todos); // release the lock before rendering
-
-    Html(render_list(&state))
+pub(crate) async fn list_todos(pool: &SqlitePool) -> Result<Vec<Todo>, sqlx::Error> {
+    sqlx::query_as::<_, Todo>(
+        r#"SELECT id, text, done FROM todos ORDER BY id DESC"#
+    )
+    .fetch_all(pool)
+    .await
 }
 
-pub(crate) async fn toggle_todo(
-    State(state): State<AppState>,
-    Path(id): Path<u64>,
-) -> Html<String> {
-    let mut todos = state.todos.lock().expect("poisoned");
-    if let Some(t) = todos.iter_mut().find(|t| t.id == id) {
-        t.done = !t.done;
-    }
-    drop(todos);
-    Html(render_list(&state))
+pub(crate) async fn add_todo_db(pool: &SqlitePool, text: &str) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"INSERT INTO todos (text, done) VALUES (?1, 0)"#
+    )
+    .bind(text)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
-pub(crate) async fn delete_todo(
-    State(state): State<AppState>,
-    Path(id): Path<u64>,
-) -> Html<String> {
-    let mut todos = state.todos.lock().expect("poisoned");
-    todos.retain(|t| t.id != id);
-    drop(todos);
-    Html(render_list(&state))
+pub(crate) async fn toggle_todo_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    // flip 0/1
+    sqlx::query(
+        r#"UPDATE todos SET done = CASE done WHEN 0 THEN 1 ELSE 0 END WHERE id = ?1"#
+    )
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn delete_todo_db(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"DELETE FROM todos WHERE id = ?1"#
+    )
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }

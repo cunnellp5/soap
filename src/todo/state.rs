@@ -1,13 +1,15 @@
-use std::sync::{Arc, Mutex};
+use sqlx::{FromRow, SqlitePool};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct AppState {
-    pub(crate) todos: Arc<Mutex<Vec<Todo>>>,
+    pub(crate) pool: SqlitePool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(FromRow, Debug, Clone)]
 pub(crate) struct Todo {
-    pub(crate) id: u64,
+    pub(crate) id: i64,
     pub(crate) text: String,
-    pub(crate) done: bool,
+    pub(crate) done: i64, // 0 or 1 in SQLite
+    // created_at can be added if you need it in UI:
+    // created_at: chrono::NaiveDateTime,
 }
